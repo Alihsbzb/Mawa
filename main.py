@@ -950,6 +950,17 @@ async def route_health():
     return {"status": "active", "timestamp": datetime.utcnow().isoformat()}
 
 # ==============================================================================
+# ردیاب سیگنال پیام‌ها (جهت تست و عیب‌یابی)
+# ==============================================================================
+
+@bot.on_message(group=-1)
+async def diagnostic_logger(client: Client, msg: Message):
+    """به محض ارسال هر پیامی به ربات، این بخش در لاگ‌های ریلوِی پیام چاپ می‌کند"""
+    sender = msg.from_user.id if msg.from_user else "ناشناس"
+    text_preview = msg.text or "[فایل یا مدیا]"
+    log.info("📩 سیگنال پیام جدید دریافت شد! فرستنده: %s | متن: %s", sender, text_preview)
+
+# ==============================================================================
 # راه‌اندازی همزمان سرور و ربات تلگرام در یک چرخه ناهمگام
 # ==============================================================================
 
@@ -961,9 +972,16 @@ async def main_runner():
     if missing_vars:
         log.error("تنظیمات کلیدی ریلوِی ناقص است: %s", ", ".join(missing_vars))
         log.error("لطفاً مقادیر بالا را در تب Variables سرور ابری خود تکمیل کنید.")
+        return
 
     init_db()
 
+    # ابتدا ربات را استارت می‌زنیم تا کانکشن تلگرام کاملاً برقرار شود
+    await bot.start()
+    bot_info = await bot.get_me()
+    log.info("ربات تلگرام با موفقیت با یوزرنیم @%s فعال شد.", bot_info.username)
+
+    # سپس وب‌سرور و پاک‌کننده حافظه را بالا می‌آوریم
     config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info", loop="asyncio")
     server = uvicorn.Server(config)
 
@@ -972,23 +990,15 @@ async def main_runner():
         asyncio.create_task(memory_cleanup_agent())
     ]
 
-    if not missing_vars:
-        await bot.start()
-        bot_info = await bot.get_me()
-        log.info("ربات تلگرام با موفقیت با یوزرنیم @%s فعال شد.", bot_info.username)
-    else:
-        log.warning("ربات تلگرام به دلیل عدم تنظیم پارامترها ران نشد. وب‌سرور فعال است.")
-
     log.info("وب‌سرور مانهواخوان روی پورت %s فعال شد.", PORT)
 
     try:
         await asyncio.gather(*app_tasks)
     finally:
-        if not missing_vars:
-            try:
-                await bot.stop()
-            except Exception:
-                pass
+        try:
+            await bot.stop()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     try:
