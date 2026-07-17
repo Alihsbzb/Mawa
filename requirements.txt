@@ -1,5 +1,6 @@
-fastapi
-uvicorn
-pyrofork
-tgcrypto
-httpx
+pyrogram==2.0.106
+tgcrypto==1.2.5
+fastapi==0.111.0
+uvicorn==0.30.1
+sqlalchemy==2.0.30
+python-multipart==0.0.9
